@@ -1,7 +1,7 @@
 ######################################
 # Automatized Casa Analysis Pipeline
-# v0.9
-# 2015-01-16
+# v0.10
+# 2015-01-29
 #
 # Isabelle Stévant
 # University of Geneva
@@ -31,6 +31,17 @@
 # THE SOFTWARE.
 
 ######################################
+
+
+
+# /////// ChangeLog /////// #
+
+##### v0.10 #####
+# Implement (partial) unit support:
+#    - split unit from concentration values
+#    - convert mM values to µM
+#    - convert concentration values to numerics (proper ordering on the x axis of the graphs)
+#####
 
 
 
@@ -139,7 +150,26 @@ mydialog <- function(){
 
 		getStdError <- function(expVar){
 			sd(expVar, na.rm=TRUE)/sqrt(length(expVar))
-		}		
+		}
+
+		getConcentrationAsNumeric <- function(rawConcentration){
+			concentrationValue <- vector()
+			for (concentration in rawConcentration) {
+				unit <- gsub("[[:digit:][:punct:]]","",concentration)
+				if (unit=="mm"){
+					value <- as.numeric(gsub("[[:alpha:]]","",concentration))*1000
+				} else if (unit=="um"){
+					value <- as.numeric(gsub("[[:alpha:]]","",concentration))
+				} else {
+
+					value <- "Unknown Unit"
+				}
+				print(unit)
+				concentrationValue <- c(concentrationValue, value)
+			}
+			return(concentrationValue)
+		}
+
 
 		# Replace NA values by 0
 		casa_mesures[is.na(casa_mesures)] <- 0
@@ -150,6 +180,8 @@ mydialog <- function(){
 		# Remove space and transform string to lower case to unify concentration values
 		casa_mesures$study_number <- tolower(gsub(" ", "", casa_mesures$study_number))
 		casa_mesures$analysis_date_time <- str_split_fixed(casa_mesures$analysis_date_time, fixed(" "), 2)[, 1]
+
+		casa_mesures$study_number <- getConcentrationAsNumeric(casa_mesures$study_number)
 
 		expId <- paste(casa_mesures$analysis_date_time, casa_mesures$lab_tech_name, sep="_")
 
@@ -262,7 +294,7 @@ mydialog <- function(){
 
 			condition_list <- unique(tolower(molecule_test[grep("C_", molecule_test$animal_id, invert=T), "study_number"]))
 
-			result_table <- rbind(result_table, c(molecule, replicates, "0.00nM", 100, 0, 0, 100, 0, 0, 100, 0, 0, 100, 0, 0, 100, 0, 0),deparse.level = 0)
+			result_table <- rbind(result_table, c(molecule, replicates, 0, 100, 0, 0, 100, 0, 0, 100, 0, 0, 100, 0, 0, 100, 0, 0),deparse.level = 0)
 
 
 			for (concentration in condition_list) {
@@ -428,7 +460,7 @@ mydialog <- function(){
 
 			pd <- position_dodge(.5)
 
-			n <- experiment2[experiment2[,"conditions"]=="0.00nM","n"]
+			n <- experiment2[experiment2[,"conditions"]==0,"n"]
 
 			my_grob = grobTree(textGrob(paste("n=",n,sep=""), x=0.85,  y=0.95, hjust=0, gp=gpar(fontsize=10)))
 
@@ -439,7 +471,8 @@ mydialog <- function(){
 				theme(legend.position="bottom") +
 				annotation_custom(my_grob)+
 				geom_text(aes(label=Paired_t_test_motile), hjust=-0.5, vjust=1.2, colour = "black", size=3)+
-				scale_x_discrete(name="") +
+				scale_x_discrete(name=expression(paste("Concentration (", mu, "M)"))) +
+
 				scale_y_continuous(name="% of Motile Sperm Control")
 
 			p_ALH <- ggplot(experiment2, aes(x=conditions, y=percent_mean_ALH, color=molecule, ymin=percent_mean_ALH-se_percent_mean_ALH, ymax=percent_mean_ALH+se_percent_mean_ALH), position=pd) + 
@@ -449,7 +482,8 @@ mydialog <- function(){
 				theme(legend.position="bottom") +
 				annotation_custom(my_grob)+
 				geom_text(aes(label=Paired_t_test_ALH), hjust=-0.5, vjust=1.2, colour = "black", size=3)+
-				scale_x_discrete(name="") +
+				scale_x_discrete(name=expression(paste("Concentration (", mu, "M)"))) +
+
     			scale_y_continuous(name="% of ALH Control")
 
 			p_VCL <- ggplot(experiment2, aes(x=conditions, y=percent_mean_VCL, color=molecule, ymin=percent_mean_VCL-se_percent_mean_VCL, ymax=percent_mean_VCL+se_percent_mean_VCL), position=pd) + 
@@ -459,7 +493,8 @@ mydialog <- function(){
 				theme(legend.position="bottom") +
 				annotation_custom(my_grob)+
 				geom_text(aes(label=Paired_t_test_VCL), hjust=-0.5, vjust=1.2, colour = "black", size=3)+
-				scale_x_discrete(name="") +
+				scale_x_discrete(name=expression(paste("Concentration (", mu, "M)"))) +
+
     			scale_y_continuous(name="% of VCL Control")
 
 			p_prog <- ggplot(experiment2, aes(x=conditions, y=percent_mean_progressive, color=molecule, ymin=percent_mean_progressive-se_percent_mean_progressive, ymax=percent_mean_progressive+se_percent_mean_progressive), position=pd) + 
@@ -469,7 +504,8 @@ mydialog <- function(){
 				theme(legend.position="bottom") +
 				annotation_custom(my_grob)+
 				geom_text(aes(label=Paired_t_test_progressive), hjust=-0.5, vjust=1.2, colour = "black", size=3)+
-				scale_x_discrete(name="") +
+				scale_x_discrete(name=expression(paste("Concentration (", mu, "M)"))) +
+
     			scale_y_continuous(name="% of Progressive Sperm Control")
 
 			p_hyp <- ggplot(experiment2, aes(x=conditions, y=percent_mean_hyperactive, color=molecule, ymin=percent_mean_hyperactive-se_percent_mean_hyperactive, ymax=percent_mean_hyperactive+se_percent_mean_hyperactive), position=pd) + 
@@ -479,7 +515,7 @@ mydialog <- function(){
 				theme(legend.position="bottom") +
 				annotation_custom(my_grob)+
 				geom_text(aes(label=Paired_t_test_hyperactive), hjust=-0.2, vjust=1.2, colour = "black", size=3)+
-				scale_x_discrete(name="") +
+				scale_x_discrete(name=expression(paste("Concentration (", mu, "M)"))) +
     			scale_y_continuous(name="% of Hyperactivity Sperm Control")
 
 		# pdf(paste(result_path,paste(paste("graphs",paste(project_name, molecule, sep="_"), sep="_"),"pdf",sep="."), sep="/"))
